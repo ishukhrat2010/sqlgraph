@@ -45,10 +45,10 @@ def remove_commented_lines(text):
 
 # Main function that identifies target and source tables in a sql-statement
 # The section_text supposed to start with a target table name
-def analyze_section(section_text, module_name=''):
+def analyze_section(section_text, module_name='', action_type = 'insert'):
     result=[]
     target_table = None
-    
+
     # Regular expression patterns
     target_table_pattern = r'^\w+(\.\w+)?'
     nested_section_pattern = r'\bWITH\b(.*?)\)\s*SELECT\b'
@@ -67,7 +67,7 @@ def analyze_section(section_text, module_name=''):
         for nested_section_content in nested_sections:
             nested_section_content = nested_section_content.strip()
             updated_section_text = updated_section_text.replace(nested_section_content, '')
-            ctes = analyze_cte(nested_section_content + ')')
+            ctes = analyze_cte(nested_section_content + ')', module_name, action_type)
             if ctes:
                 for cte in ctes:
                     result.append(cte)
@@ -78,16 +78,16 @@ def analyze_section(section_text, module_name=''):
     source_table_pattern = r'(?:FROM|JOIN)\s+(\w+(?:\.\w+)?)'
     source_tables = re.findall(source_table_pattern, updated_section_text, flags=re.IGNORECASE)
 
-    result.append({'target table': target_table, 'source tables': source_tables, 'module': module_name})
+    result.append({'target table': target_table, 'source tables': source_tables, 'module': module_name, 'edge_type': action_type})
 
     print("Analyzing section:\n", updated_section_text)
     return result
 
 
-# identifies the boundaries of common table expression and 
-# calls the analyze_section() recursively
+# identifies the boundaries of common table expressions (CTE) and 
+# calls the analyze_section() for each CTE
 #  
-def analyze_cte(cte_text, module_name=''):
+def analyze_cte(cte_text, module_name='', action_type='insert'):
     result = []
     print("Analyzing CTE:\n", cte_text)
 
@@ -115,7 +115,7 @@ def analyze_cte(cte_text, module_name=''):
     # print("CTE Sections:", cte_sections)
     if cte_sections:
         for x in cte_sections:
-            relationship = analyze_section(x, module_name)  # (recursive) call to analyze_section function
+            relationship = analyze_section(x, module_name, action_type)  # (recursive) call to analyze_section function
             if relationship:
                 for r in relationship:
                     result.append(r)
@@ -135,6 +135,8 @@ def analyze_text(text, module_name=''):
 
     for i in range(1, len(sections), 2):
         section_start = sections[i]
+        #TODO: identify insert or update 
+        # mc = re.match(section_start_pattern, section_start)
         section_content = sections[i + 1].strip()
 
         # Find the position of the section's end (semicolon)
