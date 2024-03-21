@@ -38,30 +38,17 @@ def remove_commented_lines(text):
                 continue
             if (line.strip().startswith('*/') and multiline_comment):  # toggle back multiline comment flag
                 multiline_comment = False
-                continue
-        
-        
-    # lines = text.splitlines()    
-    # filtered_lines = []
-    # in_comment_block = False
-    # for line in lines:
-    #     if not in_comment_block:
-    #         if line.strip().startswith('--'):
-    #             continue
-    #         elif line.strip().startswith('/*'):
-    #             in_comment_block = True
-    #             continue
-    #     if line.strip().endswith('*/'):
-    #         in_comment_block = False
-    #         continue
-    #     filtered_lines.append(line)
+                continue        
     
     return '\n'.join(filtered_lines)
 
 
-
-def analyze_section(section_text):
+# Main function that identifies target and source tables in a sql-statement
+# The section_text supposed to start with a target table name
+def analyze_section(section_text, module_name=''):
     result=[]
+    target_table = None
+    
     # Regular expression patterns
     target_table_pattern = r'^\w+(\.\w+)?'
     nested_section_pattern = r'\bWITH\b(.*?)\)\s*SELECT\b'
@@ -70,16 +57,14 @@ def analyze_section(section_text):
     target_table_match = re.search(target_table_pattern, section_text)
     if target_table_match:
         target_table = target_table_match.group()
-    else:
-        target_table = None
 
     # Check if there is a nested section (CTE)
-    nested_section_matches = re.findall(nested_section_pattern, section_text, flags=re.DOTALL)
+    nested_sections = re.findall(nested_section_pattern, section_text, flags=re.DOTALL)
 
     updated_section_text = section_text  # Initialize the variable
 
-    if nested_section_matches:
-        for nested_section_content in nested_section_matches:
+    if nested_sections:
+        for nested_section_content in nested_sections:
             nested_section_content = nested_section_content.strip()
             updated_section_text = updated_section_text.replace(nested_section_content, '')
             ctes = analyze_cte(nested_section_content + ')')
@@ -93,13 +78,16 @@ def analyze_section(section_text):
     source_table_pattern = r'(?:FROM|JOIN)\s+(\w+(?:\.\w+)?)'
     source_tables = re.findall(source_table_pattern, updated_section_text, flags=re.IGNORECASE)
 
-    result.append({'target table': target_table, 'source tables': source_tables})
+    result.append({'target table': target_table, 'source tables': source_tables, 'module': module_name})
 
     print("Analyzing section:\n", updated_section_text)
     return result
 
 
-def analyze_cte(cte_text):
+# identifies the boundaries of common table expression and 
+# calls the analyze_section() recursively
+#  
+def analyze_cte(cte_text, module_name=''):
     result = []
     print("Analyzing CTE:\n", cte_text)
 
@@ -124,10 +112,10 @@ def analyze_cte(cte_text):
         # cte_sections.append({'table_name': table_name, 'content': section_content})
         cte_sections.append( section_content)
 
-    print("CTE Sections:", cte_sections)
+    # print("CTE Sections:", cte_sections)
     if cte_sections:
         for x in cte_sections:
-            relationship = analyze_section(x)
+            relationship = analyze_section(x, module_name)  # (recursive) call to analyze_section function
             if relationship:
                 for r in relationship:
                     result.append(r)
@@ -135,12 +123,13 @@ def analyze_cte(cte_text):
     return result
 
 
-# Analyzes SQL script and returns  
+# Analyzes SQL script and returns identified graph nodes 
 def analyze_text(text, module_name=''):
     # Regular expression patterns
     section_start_pattern = r'\b(insert into|create table|create temp table|create temporary table)\b'
     section_end_pattern = r';'
 
+    # Let's find all spots where table is created or records are inserted
     sections = re.split(section_start_pattern, text, flags=re.IGNORECASE)
     results = []
 
@@ -148,7 +137,7 @@ def analyze_text(text, module_name=''):
         section_start = sections[i]
         section_content = sections[i + 1].strip()
 
-        # Find the position of the section end (semicolon)
+        # Find the position of the section's end (semicolon)
         semicolon_match = re.search(section_end_pattern, section_content)
         if semicolon_match:
             section_end = semicolon_match.start() + 1
@@ -159,12 +148,12 @@ def analyze_text(text, module_name=''):
         # Extract the section from the content
         section = section_content[:section_end].strip()
 
-        analysis_result = analyze_section(section)
+        analysis_result = analyze_section(section, module_name)
         if analysis_result:
             for s in analysis_result:
                 results.insert(0, s)
 
-    return module_name,results
+    return results
 
 
 # def build_graph(analysis_results):
@@ -177,30 +166,27 @@ def analyze_text(text, module_name=''):
 #         for source_table in source_tables:
 #             print(f'source: {source_table};  target: {target_table}')
 #             graph.add_edge(source_table, target_table)
-
-
 #     return graph
 
-def visualize_graph(graph):
-    # Visualization as hierarchy with circular nodes (optional)
-    pos = graphviz_layout(graph, prog='dot', args='-Grankdir=BT')  # Set rankdir to top to bottom (TB)
-    plt.figure(figsize=(50, 20))
-    node_labels = {node: node.split('.')[-1] for node in graph.nodes()}
-    node_sizes = [len(label) * 1200 for label in node_labels.values()]  # Adjusted node size
-    nx.draw_networkx(graph, pos, with_labels=True, labels=node_labels, node_shape='o', node_size=node_sizes, font_size=10, font_weight='bold', arrowsize=20)
-    plt.show()
+# def visualize_graph(graph):
+#     # Visualization as hierarchy with circular nodes (optional)
+#     pos = graphviz_layout(graph, prog='dot', args='-Grankdir=BT')  # Set rankdir to top to bottom (TB)
+#     plt.figure(figsize=(50, 20))
+#     node_labels = {node: node.split('.')[-1] for node in graph.nodes()}
+#     node_sizes = [len(label) * 1200 for label in node_labels.values()]  # Adjusted node size
+#     nx.draw_networkx(graph, pos, with_labels=True, labels=node_labels, node_shape='o', node_size=node_sizes, font_size=10, font_weight='bold', arrowsize=20)
+#     plt.show()
+
 
 if __name__ == '__main__':
     filename = input("Enter the file name (or press Enter for default): ").strip()
     if not filename:
-        filename = 'samples/sample_1.sql'
+        filename = 'samples/sample_2.sql'
 
     file_content = load_text(filename)
     if file_content is not None:
         text_without_comments = remove_commented_lines(file_content)        
-        print(text_without_comments)
-        pass
-        module, analysis_results = analyze_text(text_without_comments)
+        analysis_results = analyze_text(text_without_comments, filename)
+        print(analysis_results)
         # graph = build_graph(analysis_results)
-
         # visualize_graph(graph)
