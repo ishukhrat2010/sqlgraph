@@ -1,23 +1,29 @@
-# build_graph.py v0.3
+# builder.py v0.1
 
 import re
 from helpers.loader import load_text
 
 import logging
-DEBUG_MODE = True
-logger = logging.getLogger(__name__)
 
 # import networkx as nx
 # import matplotlib.pyplot as plt
 # from networkx.drawing.nx_agraph import graphviz_layout
 
+DEBUG_MODE = False
+logger = logging.getLogger(__name__)
+
 def init_logging():
-    logging.basicConfig(filename='sqlgraph.log', level=logging.INFO)
+    if not DEBUG_MODE:
+        return
+
+    logging.basicConfig(filename='builder_debug.log', level=logging.INFO)
     logger.info('START')
 
 def log_info(message):
-    if DEBUG_MODE == True:
-        logger.info(message)
+    if not DEBUG_MODE:
+        return
+    
+    logger.info(message)
 
 
 # Removes commented lines or block commented with /*  */
@@ -58,87 +64,106 @@ def remove_commented_lines(text):
 # Main function that identifies target and source tables in a sql-statement
 # The section_text supposed to start with a target table name
 def analyze_section(section_text, module_name='', action_type = 'insert'):
+
+    def log_start(stext):
+        log_info('-----------------------------------------------------------------')
+        log_info('Section to analyze:')
+        log_info(stext)
+        log_info('-----------------------------------------------------------------')
+        log_info('RESULT:')
+
+    def log_result():
+        pass
+
+    def analyze_cte(atext):
+        # Regular expression pattern to match CTEs
+        pattern = r'WITH\s+([a-zA-Z0-9_]+)\s+AS\s+\((.*?)\)(?:\s*,\s*([a-zA-Z0-9_]+)\s+AS\s+\((.*?)\))*'
+        match_span = (-1, -1)
+
+        matches = re.search(pattern, atext, re.IGNORECASE | re.DOTALL)
+
+        if matches:
+            match_span = matches.span()
+            cte_pairs = matches.groups()
+            cte_names = cte_pairs[::2]
+            cte_definitions = cte_pairs[1::2]
+            for cte_name, cte_definition in zip(cte_names, cte_definitions):                
+                sub_section = cte_name + ' ' + cte_definition.strip()
+                # recursive call
+                cte_result=analyze_section(sub_section, module_name, 'insert')  # consider changing 'insert' to 'cte'
+                result.append(cte_result)
+            # section_text = re.sub(pattern, '', section_text)
+        return match_span
+
+
     result=[]
     target_table = None
-    log_info('Section to analyze:')
-    log_info('-------------------')
-    log_info(section_text)
-    log_info('---------------------------------------------------')
-    log_info('RESULT:')
 
     # Regular expression patterns
     target_table_pattern = r'^\w+(\.\w+)?'
-    nested_section_pattern = r'\bWITH\b(.*?)\)\s*SELECT\b'
+    # nested_section_pattern = r'\bWITH\b(.*?)\)\s*SELECT\b'
 
     # Find the target table using the pattern
     target_table_match = re.search(target_table_pattern, section_text)
     if target_table_match:
         target_table = target_table_match.group()
 
-    # Check if there is a nested section (CTE)
-    nested_sections = re.findall(nested_section_pattern, section_text, flags=re.DOTALL)
+    start, end = analyze_cte(section_text)
 
-    updated_section_text = section_text  # Initialize the variable
+    # # Check if there is a nested section (CTE)
+    # nested_sections = re.findall(nested_section_pattern, section_text, flags=re.DOTALL)
 
-    if nested_sections:
-        for nested_section_content in nested_sections:
-            nested_section_content = nested_section_content.strip()
-            updated_section_text = updated_section_text.replace(nested_section_content, '')
-            ctes = analyze_cte(nested_section_content + ')', module_name, action_type)
-            if ctes:
-                for cte in ctes:
-                    result.append(cte)
-
-        updated_section_text = re.sub(r'WITH\s*\)', '', updated_section_text)  # Remove 'WITH )'
-    for r in result:
-        log_info(r)
+    if (start >=0) and (end>=0):
+        updated_section_text = section_text[:start] + section_text[end:]
+    else:
+        updated_section_text = section_text
+        log_start(section_text)
 
     # Find source tables
     source_table_pattern = r'(?:FROM|JOIN)\s+(\w+(?:\.\w+)?)'
     source_tables = re.findall(source_table_pattern, updated_section_text, flags=re.IGNORECASE)
     new_pair = {'target table': target_table, 'source tables': source_tables, 'module': module_name, 'edge_type': action_type}
     log_info(new_pair)
+    log_info('-----------------------------------------------------------------')
     result.append(new_pair)
-    # 
-    log_info('---------------------------------------------------')
     return result
 
 
-# identifies the boundaries of common table expressions (CTE) and 
-# calls the analyze_section() for each CTE
-#  
-def analyze_cte(cte_text, module_name='', action_type='insert'):
-    result = []
+# # identifies the boundaries of common table expressions (CTE) and 
+# # calls the analyze_section() for each CTE
+# #  
+# def analyze_cte2(cte_text, module_name='', action_type='insert'):
+#     result = []
 
-    # Regular expression pattern to find section starts and ends
-    section_pattern = r'(\w+)\s+AS\s+\('
+#     # Regular expression pattern to find section starts and ends
+#     section_pattern = r'(\w+)\s+AS\s+\('
 
-    # Find all section starts and their positions
-    section_starts = [(match.group(1), match.start()) for match in re.finditer(section_pattern, cte_text)]
+#     # Find all section starts and their positions
+#     section_starts = [(match.group(1), match.start()) for match in re.finditer(section_pattern, cte_text)]
 
-    # Extract the content of each section and store table_name and content in a list of dictionaries
-    cte_sections = []
-    for i in range(len(section_starts)):
-        table_name, start_pos = section_starts[i]
+#     # Extract the content of each section and store table_name and content in a list of dictionaries
+#     cte_sections = []
+#     for i in range(len(section_starts)):
+#         table_name, start_pos = section_starts[i]
 
-        # If it's the last section, end position is ';', otherwise it's before the next section start
-        if i + 1 < len(section_starts):
-            end_pos = section_starts[i + 1][1]
-        else:
-            end_pos = cte_text.find(';', start_pos)
+#         # If it's the last section, end position is ';', otherwise it's before the next section start
+#         if i + 1 < len(section_starts):
+#             end_pos = section_starts[i + 1][1]
+#         else:
+#             end_pos = cte_text.find(';', start_pos)
 
-        section_content = table_name+' AS ' + cte_text[start_pos + len(table_name) + 4: end_pos].strip()
-        # cte_sections.append({'table_name': table_name, 'content': section_content})
-        cte_sections.append( section_content)
+#         section_content = table_name+' AS ' + cte_text[start_pos + len(table_name) + 4: end_pos].strip()
+#         # cte_sections.append({'table_name': table_name, 'content': section_content})
+#         cte_sections.append( section_content)
 
-    if cte_sections:
-        for x in cte_sections:
-            relationship = analyze_section(x, module_name, action_type)  # (recursive) call to analyze_section function
-            if relationship:
-                for r in relationship:
-                    result.append(r)
+#     if cte_sections:
+#         for x in cte_sections:
+#             relationship = analyze_section(x, module_name, action_type)  # (recursive) call to analyze_section function
+#             if relationship:
+#                 for r in relationship:
+#                     result.append(r)
 
-    return result
+#     return result
 
 
 # Analyzes SQL script and returns identified graph nodes 
@@ -207,11 +232,15 @@ def do_job(fname):
     if file_content is not None:
         text_without_comments = remove_commented_lines(file_content)        
         analysis_results = analyze_text(text_without_comments, fname)
+        print(analysis_results)
         # graph = build_graph(analysis_results)
         # visualize_graph(graph)
 
 if __name__ == '__main__':
-    init_logging()    
+
+    # DEBUG_MODE = True   # Uncomment this line to write debug logs
+    init_logging()
+    
     filename = input("Enter the file name (or press Enter for default): ").strip()
     if not filename:
         filename = 'samples/sample_4.sql'
