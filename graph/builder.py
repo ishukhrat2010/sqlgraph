@@ -3,9 +3,21 @@
 import re
 from helpers.loader import load_text
 
+import logging
+DEBUG_MODE = True
+logger = logging.getLogger(__name__)
+
 # import networkx as nx
 # import matplotlib.pyplot as plt
 # from networkx.drawing.nx_agraph import graphviz_layout
+
+def init_logging():
+    logging.basicConfig(filename='sqlgraph.log', level=logging.INFO)
+    logger.info('START')
+
+def log_info(message):
+    if DEBUG_MODE == True:
+        logger.info(message)
 
 
 # Removes commented lines or block commented with /*  */
@@ -48,6 +60,11 @@ def remove_commented_lines(text):
 def analyze_section(section_text, module_name='', action_type = 'insert'):
     result=[]
     target_table = None
+    log_info('Section to analyze:')
+    log_info('-------------------')
+    log_info(section_text)
+    log_info('---------------------------------------------------')
+    log_info('RESULT:')
 
     # Regular expression patterns
     target_table_pattern = r'^\w+(\.\w+)?'
@@ -73,14 +90,17 @@ def analyze_section(section_text, module_name='', action_type = 'insert'):
                     result.append(cte)
 
         updated_section_text = re.sub(r'WITH\s*\)', '', updated_section_text)  # Remove 'WITH )'
+    for r in result:
+        log_info(r)
 
     # Find source tables
     source_table_pattern = r'(?:FROM|JOIN)\s+(\w+(?:\.\w+)?)'
     source_tables = re.findall(source_table_pattern, updated_section_text, flags=re.IGNORECASE)
-
-    result.append({'target table': target_table, 'source tables': source_tables, 'module': module_name, 'edge_type': action_type})
-
-    print("Analyzing section:\n", updated_section_text)
+    new_pair = {'target table': target_table, 'source tables': source_tables, 'module': module_name, 'edge_type': action_type}
+    log_info(new_pair)
+    result.append(new_pair)
+    # 
+    log_info('---------------------------------------------------')
     return result
 
 
@@ -89,7 +109,6 @@ def analyze_section(section_text, module_name='', action_type = 'insert'):
 #  
 def analyze_cte(cte_text, module_name='', action_type='insert'):
     result = []
-    print("Analyzing CTE:\n", cte_text)
 
     # Regular expression pattern to find section starts and ends
     section_pattern = r'(\w+)\s+AS\s+\('
@@ -112,7 +131,6 @@ def analyze_cte(cte_text, module_name='', action_type='insert'):
         # cte_sections.append({'table_name': table_name, 'content': section_content})
         cte_sections.append( section_content)
 
-    # print("CTE Sections:", cte_sections)
     if cte_sections:
         for x in cte_sections:
             relationship = analyze_section(x, module_name, action_type)  # (recursive) call to analyze_section function
@@ -126,17 +144,22 @@ def analyze_cte(cte_text, module_name='', action_type='insert'):
 # Analyzes SQL script and returns identified graph nodes 
 def analyze_text(text, module_name=''):
     # Regular expression patterns
-    section_start_pattern = r'\b(insert into|create table|create temp table|create temporary table)\b'
+    section_start_pattern = r'\b(insert(?:\s+into)|create table|create temp table|create temporary table|update)\b'
+    rex_obj = re.compile(section_start_pattern, flags=re.IGNORECASE)
     section_end_pattern = r';'
 
     # Let's find all spots where table is created or records are inserted
-    sections = re.split(section_start_pattern, text, flags=re.IGNORECASE)
+    # sections = re.split(section_start_pattern, text, flags=re.IGNORECASE)
+    sections = rex_obj.split(text)
     results = []
 
     for i in range(1, len(sections), 2):
         section_start = sections[i]
-        #TODO: identify insert or update 
-        # mc = re.match(section_start_pattern, section_start)
+        if section_start.lower() == 'update':
+            action='update'
+        else:
+            action='insert'
+
         section_content = sections[i + 1].strip()
 
         # Find the position of the section's end (semicolon)
@@ -150,7 +173,7 @@ def analyze_text(text, module_name=''):
         # Extract the section from the content
         section = section_content[:section_end].strip()
 
-        analysis_result = analyze_section(section, module_name)
+        analysis_result = analyze_section(section, module_name, action)
         if analysis_result:
             for s in analysis_result:
                 results.insert(0, s)
@@ -166,7 +189,6 @@ def analyze_text(text, module_name=''):
 #         source_tables = result['source tables']
 
 #         for source_table in source_tables:
-#             print(f'source: {source_table};  target: {target_table}')
 #             graph.add_edge(source_table, target_table)
 #     return graph
 
@@ -180,15 +202,17 @@ def analyze_text(text, module_name=''):
 #     plt.show()
 
 
-if __name__ == '__main__':
-    filename = input("Enter the file name (or press Enter for default): ").strip()
-    if not filename:
-        filename = 'samples/sample_2.sql'
-
-    file_content = load_text(filename)
+def do_job(fname):
+    file_content = load_text(fname)
     if file_content is not None:
         text_without_comments = remove_commented_lines(file_content)        
-        analysis_results = analyze_text(text_without_comments, filename)
-        print(analysis_results)
+        analysis_results = analyze_text(text_without_comments, fname)
         # graph = build_graph(analysis_results)
         # visualize_graph(graph)
+
+if __name__ == '__main__':
+    init_logging()    
+    filename = input("Enter the file name (or press Enter for default): ").strip()
+    if not filename:
+        filename = 'samples/sample_4.sql'
+    do_job(filename)
