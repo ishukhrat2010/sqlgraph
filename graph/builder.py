@@ -87,7 +87,9 @@ def analyze_section(section_text, module_name='', action_type = 'insert'):
             cte_pairs = matches.groups()
             cte_names = cte_pairs[::2]
             cte_definitions = cte_pairs[1::2]
-            for cte_name, cte_definition in zip(cte_names, cte_definitions):                
+            for cte_name, cte_definition in zip(cte_names, cte_definitions):
+                if (cte_name==None) or (cte_definition==None):
+                    continue
                 sub_section = cte_name + ' ' + cte_definition.strip()
                 # recursive call
                 cte_result=analyze_section(sub_section, module_name, 'insert')  # consider changing 'insert' to 'cte'
@@ -128,42 +130,6 @@ def analyze_section(section_text, module_name='', action_type = 'insert'):
     result.append(new_pair)
     return result
 
-
-# # identifies the boundaries of common table expressions (CTE) and 
-# # calls the analyze_section() for each CTE
-# #  
-# def analyze_cte2(cte_text, module_name='', action_type='insert'):
-#     result = []
-
-#     # Regular expression pattern to find section starts and ends
-#     section_pattern = r'(\w+)\s+AS\s+\('
-
-#     # Find all section starts and their positions
-#     section_starts = [(match.group(1), match.start()) for match in re.finditer(section_pattern, cte_text)]
-
-#     # Extract the content of each section and store table_name and content in a list of dictionaries
-#     cte_sections = []
-#     for i in range(len(section_starts)):
-#         table_name, start_pos = section_starts[i]
-
-#         # If it's the last section, end position is ';', otherwise it's before the next section start
-#         if i + 1 < len(section_starts):
-#             end_pos = section_starts[i + 1][1]
-#         else:
-#             end_pos = cte_text.find(';', start_pos)
-
-#         section_content = table_name+' AS ' + cte_text[start_pos + len(table_name) + 4: end_pos].strip()
-#         # cte_sections.append({'table_name': table_name, 'content': section_content})
-#         cte_sections.append( section_content)
-
-#     if cte_sections:
-#         for x in cte_sections:
-#             relationship = analyze_section(x, module_name, action_type)  # (recursive) call to analyze_section function
-#             if relationship:
-#                 for r in relationship:
-#                     result.append(r)
-
-#     return result
 
 
 # Analyzes SQL script and returns identified graph nodes 
@@ -243,5 +209,5 @@ if __name__ == '__main__':
     
     filename = input("Enter the file name (or press Enter for default): ").strip()
     if not filename:
-        filename = 'samples/sample_4.sql'
+        filename = 'samples/sample_5.sql'
     do_job(filename)
