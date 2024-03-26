@@ -119,7 +119,7 @@ def analyze_section(section_text, module_name='', action_type = 'insert'):
         updated_section_text = section_text[:start] + section_text[end:]
     else:
         updated_section_text = section_text
-        log_start(section_text)
+        log_start(updated_section_text)
 
     # Find source tables
     source_table_pattern = r'(?:FROM|JOIN)\s+(\w+(?:\.\w+)?)'
