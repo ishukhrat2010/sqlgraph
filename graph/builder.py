@@ -124,7 +124,7 @@ def analyze_section(section_text, module_name='', action_type = 'insert'):
     # Find source tables
     source_table_pattern = r'(?:FROM|JOIN)\s+(\w+(?:\.\w+)?)'
     source_tables = re.findall(source_table_pattern, updated_section_text, flags=re.IGNORECASE)
-    new_pair = {'target table': target_table, 'source tables': source_tables, 'module': module_name, 'edge_type': action_type}
+    new_pair = new_struct(target_table, source_tables, module_name, action_type)
     log_info(new_pair)
     log_info('-----------------------------------------------------------------')
     result.append(new_pair)
@@ -193,14 +193,18 @@ def analyze_text(text, module_name=''):
 #     plt.show()
 
 
-def do_job(fname):
+def new_struct(t='', s=[], m='', et=''):
+    return {'target': t, 'sources': s, 'module': m, 'edge_type': et}
+
+def analyze_file(fname):
     file_content = load_text(fname)
+    analysis_results = new_struct()
+
     if file_content is not None:
         text_without_comments = remove_commented_lines(file_content)        
         analysis_results = analyze_text(text_without_comments, fname)
-        print(analysis_results)
-        # graph = build_graph(analysis_results)
-        # visualize_graph(graph)
+
+    return analysis_results
 
 if __name__ == '__main__':
 
@@ -210,4 +214,4 @@ if __name__ == '__main__':
     filename = input("Enter the file name (or press Enter for default): ").strip()
     if not filename:
         filename = 'samples/sample_5.sql'
-    do_job(filename)
+    analyze_file(filename)
