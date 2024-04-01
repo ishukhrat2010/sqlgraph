@@ -33,10 +33,32 @@ def get_file_list(aPath):
     return file_list
 
 
+def compare_results(a,b):
+    target_equal = (not a['target'] and not b['target']) or (a['target'] and b['target'] and a['target']==b['target'])
+    if not target_equal:
+        return False
+
+    type_equal = (not a['edge_type'] and not b['edge_type']) or (a['edge_type'] and b['edge_type'] and a['edge_type']==b['edge_type'])
+    if not type_equal:
+        return False
+
+    if not a['sources']:
+        a_empty = True
+    else:
+        a_empty = (a['sources']==None or a['sources']==[] or a['sources']=='')
+    if not b['sources']:
+        b_empty = True
+    else:
+        b_empty = (b['sources']==None or b['sources']==[] or b['sources']=='')
+
+    sources_equal = (a_empty and b_empty) or (not a_empty and not b_empty and a['sources']==b['sources'])
+    return sources_equal
+
+
 def run_test(file_name):
     file = open(file_name, 'r')
     test_content = yaml.safe_load(file)
-    log_info(f'TEST: {file_name} \n ==============================================================')
+    log_info(f' ============================================================== \n TEST: {file_name}')
     if test_content['description']:
         log_info('DESCRIPTION:  '+test_content['description'])
     if test_content['tests']:
@@ -50,14 +72,14 @@ def run_test(file_name):
                 test_name='test ***'
             log_info(test_name)
 
-            test_passed = (tr==ar)
+            test_passed = compare_results(tr, ar)
             if test_passed:
                 log_info('Result: PASSED') 
             else:
                 log_info('Result: FAILED')
             log_info(f'    expected: {tr}')
             log_info(f'    received: {ar}')
-    log_info(' ==============================================================')
+    log_info(' <<<<<<<<<<<<<<< \n')
 
     
 
