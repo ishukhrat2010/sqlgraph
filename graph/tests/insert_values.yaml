@@ -1,0 +1,28 @@
+description: Classical INSERT INTO/SELECT VALUES
+tests:
+  - test_a:
+    name: 'Test 2.a: source and target table without schemas'
+    query_text: >
+      INSERT INTO target_table_2a(row_id, name)
+      VALUES(11, 'ABCD')
+      ;
+    result:
+      target: target_table_2a
+      sources:
+        - ''
+      module: ''
+      edge_type: 'insert'
+
+  - test_b:
+    name: 'Test 2.b: source and target table without schemas'
+    query_text: >
+      INSERT INTO target_table_2a(row_id, name)
+      SEELCT 222 AS row_id, 'EFGH' AS row_name
+      ;
+    result:
+      target: target_table_2b
+      sources:
+        - ''
+      module: ''
+      edge_type: 'insert'
+    
