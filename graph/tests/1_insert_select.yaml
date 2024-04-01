@@ -1,0 +1,44 @@
+description: Classical INSERT INTO/SELECT FROM statement
+tests:
+  - test_a:
+    name: 'Test 1.a: source and target table without schemas'
+    query_text: >
+      INSERT INTO target_table_1a(row_id, name)
+      SELECT *
+      FROM source_table_1a
+      ;
+    result:
+      target: target_table_1a
+      sources:
+        - source_table_1a
+      module: ''
+      edge_type: 'insert'
+
+  - test_b:
+    name: 'Test 1.b: source table with schema and target table without schema'
+    query_text: >
+      INSERT INTO target_schema.target_table_1b(row_id, name)
+      SELECT *
+      FROM source_table_1b
+      ;
+    result:
+      target: target_schema.target_table_1b
+      sources:
+        - source_table_1b      
+      module: ''
+      edge_type: 'insert'
+
+  - test_c:
+    name: 'Test 1.c: source and target table with schemas'
+    query_text: >
+      INSERT INTO target_schema.target_table_1c(row_id, name)
+      SELECT *
+      FROM source_schema.source_table_1c
+      ;
+    result:
+      target: target_schema.target_table_1c
+      sources:
+        - source_schema.source_table_1c
+      module: ''
+      edge_type: 'insert'
+    

@@ -1,0 +1,32 @@
+-- Use case 1. Classical INSERT with one source table
+INSERT INTO { target_table }(...)
+SELECT
+  ...
+FROM { source_table }
+[where/group by/order by ...]
+;
+
+-- Use case 2. Classical INSERT with multiple joined source tables
+INSERT INTO { target_table }(...)
+SELECT
+  ...
+FROM { source_table }
+[LEFT/RIGHT/OUTER] JOIN { source_table_2 }
+[... [LEFT/RIGHT/OUTER] JOIN { source_table_n } ]
+[WHERE/GROUP BY/ORDER BY ...]
+;
+
+-- Use case 3. INSERT  SELECT
+
+
+INSERT INTO | CREATE TABLE | CREATE TEMP TABLE 
+{ target_table }
+  [WITH { cte_source_table } AS ...]
+SELECT
+  ...
+FROM { source_table }
+[ ... JOIN { source_table_2} ...]
+[ ... JOIN { source_table_3} ...]
+...
+[ ... JOIN { source_table_n} ...]
+;
