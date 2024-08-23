@@ -1,4 +1,4 @@
-# SQL graph tool
+# SQL graph tool (v0.1)
 A tool that analizes provided SQL script and builds a graph of table dependencies. 
 This can be usefil when you have a complex SQL and you need to quickly identify which tables act as a source for the target table.
 
